@@ -38,10 +38,13 @@
 #include <gtk/gtk.h>
 #include <glib/gi18n.h>
 #include <stdlib.h>
+
+#include "remmina_public.h"
 #include "remmina_main.h"
 #include "remmina_widget_pool.h"
 #include "remmina_pref_dialog.h"
 #include "remmina_file.h"
+#include "remmina_file_manager.h"
 #include "remmina_pref.h"
 #include "remmina_file_editor.h"
 #include "remmina_connection_window.h"
@@ -125,6 +128,12 @@ void remmina_exec_command(RemminaCommandType command, const gchar* data)
 	TRACE_CALL(__func__);
 	gchar* s1;
 	gchar* s2;
+	gchar* profilename;
+	gchar filename[MAX_PATH_LEN];
+	GKeyFile *gkeyfile;
+	GDir *dir;
+	gchar *remmina_data_dir;
+	const gchar* name;
 	GtkWidget* widget;
 	GtkWindow* mainwindow;
 	GtkDialog* prefdialog;
@@ -169,7 +178,30 @@ void remmina_exec_command(RemminaCommandType command, const gchar* data)
 		break;
 
 	case REMMINA_COMMAND_CONNECT:
-		remmina_connection_window_open_from_filename(data);
+		if (g_file_test (data, G_FILE_TEST_EXISTS)) {
+			remmina_connection_window_open_from_filename(data);
+		}else  {
+			remmina_data_dir = remmina_file_get_datadir();
+			dir = g_dir_open(remmina_data_dir, 0, NULL);
+			if (dir != NULL) {
+				/* Iterate all remote desktop profiles */
+				while ((name = g_dir_read_name(dir)) != NULL) {
+					if (!g_str_has_suffix(name, ".remmina"))
+						continue;
+					g_snprintf(filename, sizeof(filename), "%s/%s", remmina_data_dir, name);
+					gkeyfile = g_key_file_new();
+					g_key_file_load_from_file(gkeyfile, filename, G_KEY_FILE_NONE, NULL);
+					profilename = g_key_file_get_string(gkeyfile, "remmina", "name", NULL);
+					if (g_strcmp0(profilename, data) == 0) {
+						remmina_connection_window_open_from_filename(filename);
+						break;
+					}
+				}
+				g_dir_close(dir);
+			}
+			g_free(remmina_data_dir);
+
+		}
 		break;
 
 	case REMMINA_COMMAND_EDIT:
