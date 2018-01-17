@@ -166,7 +166,8 @@ static gboolean remmina_plugin_terminal_new(RemminaProtocolWidget *gp)
 	// Command option
 	option_str = GET_PLUGIN_STRING("command");
 	if (option_str)
-		ADD_ARGUMENT("-e", option_str);
+		//         st -e sh -i -c "ls"
+		ADD_ARGUMENT("-e sh -i -c ", g_shell_quote(option_str));
 	g_free(option_str);
 	// End of the arguments list
 	ADD_ARGUMENT(NULL, NULL);
