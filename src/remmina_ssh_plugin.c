@@ -206,10 +206,14 @@ typedef struct _RemminaPluginSshData {
 
 static RemminaPluginService *remmina_plugin_service = NULL;
 
+static gboolean
+remmina_plugin_ssh_on_size_allocate(GtkWidget *widget, GtkAllocation *alloc, RemminaProtocolWidget *gp);
+
+
 /**
  * Remmina Protocol plugin main function.
  *
- * First it starts the SSH tunnel if needed and than the SSH connection.
+ * First it starts the SSH tunnel if needed and then the SSH connection.
  *
  */
 static gpointer
@@ -340,6 +344,10 @@ remmina_plugin_ssh_main_thread(gpointer data)
 
 	charset = REMMINA_SSH(shell)->charset;
 	remmina_plugin_ssh_vte_terminal_set_encoding_and_pty(VTE_TERMINAL(gpdata->vte), charset, shell->master, shell->slave);
+
+	/* ToDo: the following call should be moved on the main thread, or something weird could happen */
+	remmina_plugin_ssh_on_size_allocate(GTK_WIDGET(gpdata->vte), NULL, gp);
+
 	remmina_plugin_service->protocol_plugin_emit_signal(gp, "connect");
 
 	gpdata->thread = 0;
@@ -406,7 +414,8 @@ remmina_plugin_ssh_on_size_allocate(GtkWidget *widget, GtkAllocation *alloc, Rem
 	cols = vte_terminal_get_column_count(VTE_TERMINAL(widget));
 	rows = vte_terminal_get_row_count(VTE_TERMINAL(widget));
 
-	remmina_ssh_shell_set_size(gpdata->shell, cols, rows);
+	if (gpdata->shell)
+		remmina_ssh_shell_set_size(gpdata->shell, cols, rows);
 
 	return FALSE;
 }
@@ -714,8 +723,6 @@ remmina_plugin_ssh_init(RemminaProtocolWidget *gp)
 	gpdata->vte = vte;
 	remmina_plugin_ssh_set_vte_pref(gp);
 	g_signal_connect(G_OBJECT(vte), "size-allocate", G_CALLBACK(remmina_plugin_ssh_on_size_allocate), gp);
-
-	remmina_plugin_ssh_on_size_allocate(GTK_WIDGET(vte), NULL, gp);
 
 	remmina_plugin_service->protocol_plugin_register_hostkey(gp, vte);
 

@@ -74,6 +74,7 @@ GType remmina_protocol_widget_get_type(void)
 G_GNUC_CONST;
 
 GtkWidget* remmina_protocol_widget_new(void);
+void remmina_protocol_widget_setup(RemminaProtocolWidget *gp, RemminaFile* remminafile);
 
 GtkWidget* remmina_protocol_widget_get_init_dialog(RemminaProtocolWidget *gp);
 
@@ -89,7 +90,7 @@ void remmina_protocol_widget_set_current_scale_mode(RemminaProtocolWidget *gp, R
 gboolean remmina_protocol_widget_get_expand(RemminaProtocolWidget *gp);
 void remmina_protocol_widget_set_expand(RemminaProtocolWidget *gp, gboolean expand);
 gboolean remmina_protocol_widget_has_error(RemminaProtocolWidget *gp);
-gchar* remmina_protocol_widget_get_error_message(RemminaProtocolWidget *gp);
+const gchar* remmina_protocol_widget_get_error_message(RemminaProtocolWidget *gp);
 void remmina_protocol_widget_set_error(RemminaProtocolWidget *gp, const gchar *fmt, ...);
 gboolean remmina_protocol_widget_is_closed(RemminaProtocolWidget *gp);
 RemminaFile* remmina_protocol_widget_get_file(RemminaProtocolWidget *gp);

@@ -74,7 +74,6 @@ G_DEFINE_TYPE( RemminaConnectionWindow, remmina_connection_window, GTK_TYPE_WIND
 
 typedef struct _RemminaConnectionHolder RemminaConnectionHolder;
 
-
 struct _RemminaConnectionWindowPriv {
 	RemminaConnectionHolder* cnnhld;
 
@@ -141,9 +140,6 @@ typedef struct _RemminaConnectionObject {
 	RemminaConnectionHolder* cnnhld;
 
 	RemminaFile* remmina_file;
-
-	/* A dummy window which will be realized as a container during initialize, before reparent to the real window */
-	GtkWidget* window;
 
 	/* Containers for RemminaProtocolWidget: RemminaProtocolWidget->aspectframe->viewport->scrolledcontainer->...->window */
 	GtkWidget* proto;
@@ -365,6 +361,7 @@ static void remmina_connection_window_class_init(RemminaConnectionWindowClass* k
 
 static RemminaScaleMode get_current_allowed_scale_mode(RemminaConnectionObject* cnnobj, gboolean *dynres_avail, gboolean *scale_avail)
 {
+	TRACE_CALL(__func__);
 	RemminaScaleMode scalemode;
 	gboolean plugin_has_dynres, plugin_can_scale;
 
@@ -2810,10 +2807,6 @@ static void remmina_connection_window_initialize_notebook(GtkNotebook* to, GtkNo
 			gtk_widget_reparent(cnnobj->viewport, cnnobj->scrolled_container);
 			G_GNUC_END_IGNORE_DEPRECATIONS
 
-			if (cnnobj->window) {
-				gtk_widget_destroy(cnnobj->window);
-				cnnobj->window = NULL;
-			}
 		}
 	}else {
 		/* cnnobj=null: migrate all existing connections to the new notebook */
@@ -3570,10 +3563,6 @@ static gboolean remmina_connection_object_delayed_window_present(gpointer user_d
 static void remmina_connection_object_on_connect(RemminaProtocolWidget* gp, RemminaConnectionObject* cnnobj)
 {
 	TRACE_CALL(__func__);
-	RemminaConnectionWindow* cnnwin;
-	RemminaConnectionHolder* cnnhld;
-	GtkWidget* tab;
-	gint i;
 
 	gchar *last_success;
 	GDateTime *date = g_date_time_new_now_utc();
@@ -3581,22 +3570,10 @@ static void remmina_connection_object_on_connect(RemminaProtocolWidget* gp, Remm
 	/* This signal handler is called by a plugin where it's correctly connected
 	 * (and authenticated) */
 
-	if (!cnnobj->cnnhld) {
-		cnnwin = remmina_connection_window_find(cnnobj->remmina_file);
-		if (cnnwin) {
-			cnnhld = cnnwin->priv->cnnhld;
-		}else {
-			cnnhld = g_new0(RemminaConnectionHolder, 1);
-		}
-		cnnobj->cnnhld = cnnhld;
-	}else {
-		cnnhld = cnnobj->cnnhld;
-	}
-
 	cnnobj->connected = TRUE;
 
 	remmina_protocol_widget_set_hostkey_func(REMMINA_PROTOCOL_WIDGET(cnnobj->proto),
-		(RemminaHostkeyFunc)remmina_connection_window_hostkey_func, cnnhld);
+		(RemminaHostkeyFunc)remmina_connection_window_hostkey_func, cnnobj->cnnhld);
 
 	/** Remember recent list for quick connect, and save the current date
 	 * in the last_used field.
@@ -3758,8 +3735,11 @@ GtkWidget* remmina_connection_window_open_from_file_full(RemminaFile* remminafil
 {
 	TRACE_CALL(__func__);
 	RemminaConnectionObject* cnnobj;
-	GtkWidget* protocolwidget;
+	RemminaConnectionWindow* cnnwin;
+	GtkWidget* tab;
+	gint i;
 
+	/* Create the RemminaConnectionObject */
 	cnnobj = g_new0(RemminaConnectionObject, 1);
 	cnnobj->remmina_file = remminafile;
 
@@ -3768,14 +3748,44 @@ GtkWidget* remmina_connection_window_open_from_file_full(RemminaFile* remminafil
 	cnnobj->open_from_file_event_time = gtk_get_current_event_time();
 
 	/* Create the RemminaProtocolWidget */
-	protocolwidget = cnnobj->proto = remmina_protocol_widget_new();
+	cnnobj->proto = remmina_protocol_widget_new();
+	remmina_protocol_widget_setup((RemminaProtocolWidget*)cnnobj->proto, remminafile);
 
 	/* Set default remote desktop size in the profile, so the plugins can query
 	 * protocolwidget and know WxH that the user put on the profile settings */
-	remmina_protocol_widget_update_remote_resolution((RemminaProtocolWidget*)protocolwidget,
+	remmina_protocol_widget_update_remote_resolution((RemminaProtocolWidget*)cnnobj->proto,
 		remmina_file_get_int(remminafile, "resolution_width", -1),
 		remmina_file_get_int(remminafile, "resolution_height", -1)
 		);
+
+	/* Determine whether this connection will be put on a new window
+	 * or in an existing one */
+	cnnwin = remmina_connection_window_find(remminafile);
+	if (!cnnwin) {
+		/* Connection goes on a new toplevel window */
+		cnnobj->cnnhld = g_new0(RemminaConnectionHolder, 1);
+		i = remmina_file_get_int(cnnobj->remmina_file, "viewmode", 0);
+		switch (i) {
+		case SCROLLED_FULLSCREEN_MODE:
+		case VIEWPORT_FULLSCREEN_MODE:
+			remmina_connection_holder_create_fullscreen(cnnobj->cnnhld, cnnobj, i);
+			break;
+		case SCROLLED_WINDOW_MODE:
+		default:
+			remmina_connection_holder_create_scrolled(cnnobj->cnnhld, cnnobj);
+			break;
+		}
+		cnnwin = cnnobj->cnnhld->cnnwin;
+	}else {
+		cnnobj->cnnhld = cnnwin->priv->cnnhld;
+		tab = remmina_connection_object_create_tab(cnnobj);
+		i = remmina_connection_object_append_page(cnnobj, GTK_NOTEBOOK(cnnwin->priv->notebook), tab,
+			cnnwin->priv->view_mode);
+
+		gtk_window_present(GTK_WINDOW(cnnwin));
+		gtk_notebook_set_current_page(GTK_NOTEBOOK(cnnwin->priv->notebook), i);
+	}
+
 
 	/* Set a name for the widget, for CSS selector */
 	gtk_widget_set_name(GTK_WIDGET(cnnobj->proto), "remmina-protocol-widget");
@@ -3815,17 +3825,28 @@ GtkWidget* remmina_connection_window_open_from_file_full(RemminaFile* remminafil
 
 	cnnobj->aspectframe = NULL;
 	gtk_container_add(GTK_CONTAINER(cnnobj->viewport), cnnobj->proto);
-
-	cnnobj->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-	gtk_widget_realize(cnnobj->window);
-	gtk_container_add(GTK_CONTAINER(cnnobj->window), cnnobj->viewport);
+	gtk_container_add(GTK_CONTAINER(cnnobj->scrolled_container), cnnobj->viewport);
 
 	if (!remmina_pref.save_view_mode)
 		remmina_file_set_int(cnnobj->remmina_file, "viewmode", remmina_pref.default_mode);
 
-	remmina_protocol_widget_open_connection(REMMINA_PROTOCOL_WIDGET(cnnobj->proto), remminafile);
+#if FLOATING_TOOLBAR_WIDGET
+	if (cnnwin->priv->floating_toolbar_widget) {
+		gtk_widget_show(cnnwin->priv->floating_toolbar_widget);
+	}
+#else
+	if (cnnwin->priv->floating_toolbar_window) {
+		gtk_widget_show(cnnwin->priv->floating_toolbar_window);
+	}
+#endif
 
-	return protocolwidget;
+	if (remmina_protocol_widget_has_error((RemminaProtocolWidget*)cnnobj->proto)) {
+		printf("Ok, an error occured in initializing the protocol plugin before connecting. The error is %s.\n"
+			"ToDo: put this string as error to show", remmina_protocol_widget_get_error_message((RemminaProtocolWidget*)cnnobj->proto));
+	} else
+		remmina_protocol_widget_open_connection(REMMINA_PROTOCOL_WIDGET((RemminaProtocolWidget*)cnnobj->proto), remminafile);
+
+	return cnnobj->proto;
 }
 
 void remmina_connection_window_set_delete_confirm_mode(RemminaConnectionWindow* cnnwin, RemminaConnectionWindowOnDeleteConfirmMode mode)

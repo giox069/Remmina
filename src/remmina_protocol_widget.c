@@ -211,26 +211,14 @@ void remmina_protocol_widget_open_connection_real(gpointer data)
 {
 	TRACE_CALL(__func__);
 	RemminaProtocolWidget* gp = REMMINA_PROTOCOL_WIDGET(data);
-	RemminaProtocolPlugin* plugin;
-	RemminaFile* remminafile = gp->priv->remmina_file;
+
+	RemminaProtocolPlugin *plugin;
 	RemminaProtocolFeature* feature;
 	gint num_plugin;
 	gint num_ssh;
 
-	/* Locate the protocol plugin */
-	plugin = (RemminaProtocolPlugin*)remmina_plugin_manager_get_plugin(REMMINA_PLUGIN_TYPE_PROTOCOL,
-		remmina_file_get_string(remminafile, "protocol"));
-
-	if (!plugin || !plugin->init || !plugin->open_connection) {
-		remmina_protocol_widget_set_error(gp, _("Protocol plugin %s is not installed."),
-			remmina_file_get_string(remminafile, "protocol"));
-		remmina_protocol_widget_close_connection(gp);
-		return;
-	}
-
+	plugin = gp->priv->plugin;
 	plugin->init(gp);
-
-	gp->priv->plugin = plugin;
 
 	for (num_plugin = 0, feature = (RemminaProtocolFeature*)plugin->features; feature && feature->type; num_plugin++, feature++) {
 	}
@@ -918,7 +906,7 @@ gboolean remmina_protocol_widget_has_error(RemminaProtocolWidget* gp)
 	return gp->priv->has_error;
 }
 
-gchar* remmina_protocol_widget_get_error_message(RemminaProtocolWidget* gp)
+const gchar* remmina_protocol_widget_get_error_message(RemminaProtocolWidget* gp)
 {
 	TRACE_CALL(__func__);
 	return gp->priv->error_message;
@@ -1215,6 +1203,26 @@ void remmina_protocol_widget_chat_receive(RemminaProtocolWidget* gp, const gchar
 		remmina_chat_window_receive(REMMINA_CHAT_WINDOW(gp->priv->chat_window), _("Server"), text);
 		gtk_window_present(GTK_WINDOW(gp->priv->chat_window));
 	}
+}
+
+void remmina_protocol_widget_setup(RemminaProtocolWidget *gp, RemminaFile* remminafile)
+{
+	RemminaProtocolPlugin *plugin;
+
+	gp->priv->remmina_file = remminafile;
+
+	/* Locate the protocol plugin */
+	plugin = (RemminaProtocolPlugin*)remmina_plugin_manager_get_plugin(REMMINA_PLUGIN_TYPE_PROTOCOL,
+		remmina_file_get_string(remminafile, "protocol"));
+
+	if (!plugin || !plugin->init || !plugin->open_connection) {
+		remmina_protocol_widget_set_error(gp, _("Protocol plugin %s is not installed."),
+			remmina_file_get_string(remminafile, "protocol"));
+		gp->priv->plugin = NULL;
+		return;
+	}
+	gp->priv->plugin = plugin;
+
 }
 
 GtkWidget* remmina_protocol_widget_new(void)
