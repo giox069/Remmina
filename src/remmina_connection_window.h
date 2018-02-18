@@ -59,6 +59,8 @@ typedef struct _RemminaConnectionWindowClass {
 	void (*toolbar_place)(RemminaConnectionWindow * gp);
 } RemminaConnectionWindowClass;
 
+typedef struct _RemminaConnectionObject RemminaConnectionObject;
+
 typedef enum {
 	REMMINA_CONNECTION_WINDOW_ONDELETE_CONFIRM_IF_2_OR_MORE = 0,
 	REMMINA_CONNECTION_WINDOW_ONDELETE_NOCONFIRM		= 1
@@ -76,6 +78,8 @@ gboolean remmina_connection_window_delete(RemminaConnectionWindow* cnnwin);
 void remmina_connection_window_set_delete_confirm_mode(RemminaConnectionWindow* cnnwin, RemminaConnectionWindowOnDeleteConfirmMode mode);
 GtkWidget* remmina_connection_window_open_from_file_full(RemminaFile* remminafile, GCallback disconnect_cb, gpointer data,
 							 guint* handler);
+
+void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp, const gchar *message);
 
 G_END_DECLS
 

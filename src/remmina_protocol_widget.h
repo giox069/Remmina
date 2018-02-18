@@ -37,6 +37,7 @@
 #pragma once
 
 #include "remmina_init_dialog.h"
+#include "remmina_connection_window.h"
 #include "remmina_file.h"
 #include "remmina_ssh.h"
 
@@ -56,7 +57,7 @@ typedef struct _RemminaProtocolWidgetPriv RemminaProtocolWidgetPriv;
 
 struct _RemminaProtocolWidget {
 	GtkEventBox event_box;
-
+	RemminaConnectionObject *cnnobj;
 	RemminaProtocolWidgetPriv *priv;
 };
 
@@ -74,7 +75,7 @@ GType remmina_protocol_widget_get_type(void)
 G_GNUC_CONST;
 
 GtkWidget* remmina_protocol_widget_new(void);
-void remmina_protocol_widget_setup(RemminaProtocolWidget *gp, RemminaFile* remminafile);
+void remmina_protocol_widget_setup(RemminaProtocolWidget *gp, RemminaFile* remminafile, RemminaConnectionObject* cnnobj);
 
 GtkWidget* remmina_protocol_widget_get_init_dialog(RemminaProtocolWidget *gp);
 
@@ -108,8 +109,8 @@ void remmina_protocol_widget_call_feature_by_ref(RemminaProtocolWidget *gp, cons
 void remmina_protocol_widget_emit_signal(RemminaProtocolWidget *gp, const gchar *signal);
 void remmina_protocol_widget_register_hostkey(RemminaProtocolWidget *gp, GtkWidget *widget);
 
-typedef gboolean (*RemminaHostkeyFunc)(RemminaProtocolWidget *gp, guint keyval, gboolean release, gpointer data);
-void remmina_protocol_widget_set_hostkey_func(RemminaProtocolWidget *gp, RemminaHostkeyFunc func, gpointer data);
+typedef gboolean (*RemminaHostkeyFunc)(RemminaProtocolWidget *gp, guint keyval, gboolean release);
+void remmina_protocol_widget_set_hostkey_func(RemminaProtocolWidget *gp, RemminaHostkeyFunc func);
 
 gboolean remmina_protocol_widget_ssh_exec(RemminaProtocolWidget *gp, gboolean wait, const gchar *fmt, ...);
 

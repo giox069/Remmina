@@ -42,7 +42,6 @@
 #include <stdlib.h>
 
 #include "remmina_chat_window.h"
-#include "remmina_connection_window.h"
 #include "remmina_masterthread_exec.h"
 #include "remmina_ext_exec.h"
 #include "remmina_plugin_manager.h"
@@ -75,7 +74,6 @@ struct _RemminaProtocolWidgetPriv {
 	gboolean closed;
 
 	RemminaHostkeyFunc hostkey_func;
-	gpointer hostkey_func_data;
 
 	gint profile_remote_width;
 	gint profile_remote_height;
@@ -128,17 +126,6 @@ static void remmina_protocol_widget_init_cancel(RemminaInitDialog *dialog, gint 
 	    && dialog->mode == REMMINA_INIT_MODE_CONNECTING) {
 		remmina_protocol_widget_close_connection(gp);
 	}
-}
-
-static void remmina_protocol_widget_show_init_dialog(RemminaProtocolWidget* gp, const gchar *name)
-{
-	TRACE_CALL(__func__);
-	if (gp->priv->init_dialog) {
-		gtk_widget_destroy(gp->priv->init_dialog);
-	}
-	gp->priv->init_dialog = remmina_init_dialog_new(_("Connecting to '%s'..."), (name ? name : "*"));
-	g_signal_connect(G_OBJECT(gp->priv->init_dialog), "response", G_CALLBACK(remmina_protocol_widget_init_cancel), gp);
-	gtk_widget_show(gp->priv->init_dialog);
 }
 
 static void remmina_protocol_widget_hide_init_dialog(RemminaProtocolWidget* gp)
@@ -264,14 +251,21 @@ void remmina_protocol_widget_open_connection_real(gpointer data)
 void remmina_protocol_widget_open_connection(RemminaProtocolWidget* gp, RemminaFile* remminafile)
 {
 	TRACE_CALL(__func__);
+	gchar *s;
+	const gchar *name;
+
 	gp->priv->remmina_file = remminafile;
 	gp->priv->scalemode = remmina_file_get_int(remminafile, "scale", FALSE);
 	gp->priv->scaler_expand = remmina_file_get_int(remminafile, "scaler_expand", FALSE);
 
 	/* Exec precommand before everything else */
+	remmina_connection_window_message_panel_show(gp, "Executing external commands...");
 	remmina_ext_exec_new(remminafile, "precommand");
 
-	remmina_protocol_widget_show_init_dialog(gp, remmina_file_get_string(remminafile, "name"));
+	name = remmina_file_get_string(remminafile, "name");
+	s = g_strdup_printf(_("Connecting to '%s'..."), (name ? name : "*"));
+	remmina_connection_window_message_panel_show(gp, s);
+	g_free(s);
 
 	remmina_protocol_widget_open_connection_real(gp);
 }
@@ -534,7 +528,7 @@ static gboolean remmina_protocol_widget_on_key_press(GtkWidget *widget, GdkEvent
 {
 	TRACE_CALL(__func__);
 	if (gp->priv->hostkey_func) {
-		return gp->priv->hostkey_func(gp, event->keyval, FALSE, gp->priv->hostkey_func_data);
+		return gp->priv->hostkey_func(gp, event->keyval, FALSE);
 	}
 	return FALSE;
 }
@@ -543,7 +537,7 @@ static gboolean remmina_protocol_widget_on_key_release(GtkWidget *widget, GdkEve
 {
 	TRACE_CALL(__func__);
 	if (gp->priv->hostkey_func) {
-		return gp->priv->hostkey_func(gp, event->keyval, TRUE, gp->priv->hostkey_func_data);
+		return gp->priv->hostkey_func(gp, event->keyval, TRUE);
 	}
 
 	return FALSE;
@@ -556,11 +550,10 @@ void remmina_protocol_widget_register_hostkey(RemminaProtocolWidget* gp, GtkWidg
 	g_signal_connect(G_OBJECT(widget), "key-release-event", G_CALLBACK(remmina_protocol_widget_on_key_release), gp);
 }
 
-void remmina_protocol_widget_set_hostkey_func(RemminaProtocolWidget* gp, RemminaHostkeyFunc func, gpointer data)
+void remmina_protocol_widget_set_hostkey_func(RemminaProtocolWidget* gp, RemminaHostkeyFunc func)
 {
 	TRACE_CALL(__func__);
 	gp->priv->hostkey_func = func;
-	gp->priv->hostkey_func_data = data;
 }
 
 #ifdef HAVE_LIBSSH
@@ -1205,11 +1198,12 @@ void remmina_protocol_widget_chat_receive(RemminaProtocolWidget* gp, const gchar
 	}
 }
 
-void remmina_protocol_widget_setup(RemminaProtocolWidget *gp, RemminaFile* remminafile)
+void remmina_protocol_widget_setup(RemminaProtocolWidget *gp, RemminaFile* remminafile, RemminaConnectionObject* cnnobj)
 {
 	RemminaProtocolPlugin *plugin;
 
 	gp->priv->remmina_file = remminafile;
+	gp->cnnobj = cnnobj;
 
 	/* Locate the protocol plugin */
 	plugin = (RemminaProtocolPlugin*)remmina_plugin_manager_get_plugin(REMMINA_PLUGIN_TYPE_PROTOCOL,
