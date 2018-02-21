@@ -240,6 +240,8 @@ static void remmina_connection_window_class_init(RemminaConnectionWindowClass* k
 		"}\n"
 		"#remmina-cw-message-panel {\n"
 		"  border: 1px solid darkgrey;\n"
+		"  background-color: #f8f8f8;\n"
+		"  margins: 8px 8px 8px 8px;\n"
 		"}\n"
 		"GtkDrawingArea {\n"
 		"  background-color: black;\n"
@@ -3891,7 +3893,7 @@ static void remmina_connection_window_message_panel_empty(GtkContainer *mp)
 	gtk_container_foreach(mp, container_remove_cb, (gpointer)mp);
 }
 
-void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp, const gchar *message)
+void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp, const gchar *message, unsigned int flags)
 {
 	TRACE_CALL(__func__);
 	RemminaConnectionObject *cnnobj = gp->cnnobj;
@@ -3900,6 +3902,13 @@ void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp, con
 	printf("GIO: message = %s\n", message);
 
 	remmina_connection_window_message_panel_empty(GTK_CONTAINER(cnnobj->message_panel));
+
+	if (flags & MESSAGE_PANEL_SPINNER) {
+		w = gtk_spinner_new();
+		gtk_box_pack_start(GTK_BOX(cnnobj->message_panel), w, FALSE, FALSE, 0);
+		gtk_spinner_start(GTK_SPINNER(w));
+	}
+
 	w = gtk_label_new(message);
 	gtk_box_pack_start(GTK_BOX(cnnobj->message_panel), w, TRUE, TRUE, 0);
 	gtk_widget_show(cnnobj->message_panel);

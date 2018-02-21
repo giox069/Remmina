@@ -259,12 +259,12 @@ void remmina_protocol_widget_open_connection(RemminaProtocolWidget* gp, RemminaF
 	gp->priv->scaler_expand = remmina_file_get_int(remminafile, "scaler_expand", FALSE);
 
 	/* Exec precommand before everything else */
-	remmina_connection_window_message_panel_show(gp, "Executing external commands...");
+	remmina_connection_window_message_panel_show(gp, "Executing external commands...", MESSAGE_PANEL_SPINNER);
 	remmina_ext_exec_new(remminafile, "precommand");
 
 	name = remmina_file_get_string(remminafile, "name");
 	s = g_strdup_printf(_("Connecting to '%s'..."), (name ? name : "*"));
-	remmina_connection_window_message_panel_show(gp, s);
+	remmina_connection_window_message_panel_show(gp, s, MESSAGE_PANEL_SPINNER);
 	g_free(s);
 
 	remmina_protocol_widget_open_connection_real(gp);
