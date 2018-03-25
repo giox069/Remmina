@@ -3587,13 +3587,28 @@ static void remmina_connection_object_on_connect(RemminaProtocolWidget* gp, Remm
 {
 	TRACE_CALL(__func__);
 
-	RemminaConnectionObject* cnnobj = gp->cnnobj;
-
+	gint i;
+	RemminaConnectionWindow* cnnwin;
+	RemminaConnectionHolder* cnnhld;
+	GtkWidget* tab;
 	gchar *last_success;
+
 	GDateTime *date = g_date_time_new_now_utc();
 
-	/* This signal handler is called by a plugin where it's correctly connected
+	/* This signal handler is called by a plugin when it's correctly connected
 	 * (and authenticated) */
+
+	if (!cnnobj->cnnhld) {
+		cnnwin = remmina_connection_window_find(cnnobj->remmina_file);
+		if (cnnwin) {
+			cnnhld = cnnwin->priv->cnnhld;
+		}else {
+			cnnhld = g_new0(RemminaConnectionHolder, 1);
+		}
+		cnnobj->cnnhld = cnnhld;
+	}else {
+		cnnhld = cnnobj->cnnhld;
+	}
 
 	cnnobj->connected = TRUE;
 
@@ -3827,7 +3842,7 @@ GtkWidget* remmina_connection_window_open_from_file_full(RemminaFile* remminafil
 	}
 
 	gtk_widget_show(cnnobj->proto);
-	g_signal_connect(G_OBJECT(cnnobj->proto), "connect", G_CALLBACK(remmina_connection_object_on_connect), NULL);
+	g_signal_connect(G_OBJECT(cnnobj->proto), "connect", G_CALLBACK(remmina_connection_object_on_connect), cnnobj);
 	if (disconnect_cb) {
 		*handler = g_signal_connect(G_OBJECT(cnnobj->proto), "disconnect", disconnect_cb, data);
 	}
