@@ -79,8 +79,9 @@ void remmina_connection_window_set_delete_confirm_mode(RemminaConnectionWindow* 
 GtkWidget* remmina_connection_window_open_from_file_full(RemminaFile* remminafile, GCallback disconnect_cb, gpointer data,
 							 guint* handler);
 
-void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp, const gchar *message, unsigned int flags);
+void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp, const gchar *message, unsigned int flags, GCallback ok_callback, gpointer ok_cbdata);
 #define MESSAGE_PANEL_SPINNER 0x00000001
+#define MESSAGE_PANEL_OKBUTTON 0x00000002
 
 G_END_DECLS
 

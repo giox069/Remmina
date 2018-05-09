@@ -239,9 +239,9 @@ static void remmina_connection_window_class_init(RemminaConnectionWindowClass* k
 		"  background-color: black;\n"
 		"}\n"
 		"#remmina-cw-message-panel {\n"
-		"  border: 1px solid darkgrey;\n"
-		"  background-color: #f8f8f8;\n"
-		"  margins: 8px 8px 8px 8px;\n"
+		"  border: 0px solid darkblue;\n"
+		"  background-color: #f9f9f9;\n"
+		"  padding: 10px 10px 10px 10px;\n"
 		"}\n"
 		"GtkDrawingArea {\n"
 		"  background-color: black;\n"
@@ -1862,7 +1862,8 @@ static void remmina_connection_holder_toolbar_grab(GtkWidget* widget, RemminaCon
 #if DEBUG_KB_GRABBING
 		printf("DEBUG_KB_GRABBING: Grabbing for button\n");
 #endif
-		remmina_connection_holder_keyboard_grab(cnnhld);
+		if (cnnobj->connected)
+			remmina_connection_holder_keyboard_grab(cnnhld);
 	}else
 		remmina_connection_holder_keyboard_ungrab(cnnhld);
 }
@@ -2191,6 +2192,8 @@ static void remmina_connection_window_focus_in(GtkWidget* widget, RemminaConnect
 {
 	TRACE_CALL(__func__);
 
+	DECLARE_CNNOBJ
+
 #if !FLOATING_TOOLBAR_WIDGET
 	RemminaConnectionWindowPriv* priv = cnnhld->cnnwin->priv;
 
@@ -2199,7 +2202,8 @@ static void remmina_connection_window_focus_in(GtkWidget* widget, RemminaConnect
 	}
 #endif
 
-	remmina_connection_holder_keyboard_grab(cnnhld);
+	if (cnnobj->connected)
+		remmina_connection_holder_keyboard_grab(cnnhld);
 }
 
 static void remmina_connection_window_focus_out(GtkWidget* widget, RemminaConnectionHolder* cnnhld)
@@ -2251,6 +2255,8 @@ static gboolean remmina_connection_window_on_enter(GtkWidget* widget, GdkEventCr
 {
 	TRACE_CALL(__func__);
 	cnnhld->cnnwin->priv->mouse_pointer_entered = TRUE;
+	DECLARE_CNNOBJ_WITH_RETURN(FALSE);
+
 #if DEBUG_KB_GRABBING
 	printf("DEBUG_KB_GRABBING: enter detail=");
 	switch (event->detail) {
@@ -2264,7 +2270,8 @@ static gboolean remmina_connection_window_on_enter(GtkWidget* widget, GdkEventCr
 	printf("\n");
 #endif
 	if (gtk_window_is_active(GTK_WINDOW(cnnhld->cnnwin))) {
-		remmina_connection_holder_keyboard_grab(cnnhld);
+		if (cnnobj->connected)
+			remmina_connection_holder_keyboard_grab(cnnhld);
 	}
 	return FALSE;
 }
@@ -3281,8 +3288,6 @@ static void remmina_connection_window_ftb_drag_begin(GtkWidget *widget, GdkDragC
 	gtk_drag_set_icon_surface(context, surface);
 
 }
-
-
 #endif
 
 static void remmina_connection_holder_create_fullscreen(RemminaConnectionHolder* cnnhld, RemminaConnectionObject* cnnobj,
@@ -3671,10 +3676,31 @@ static void remmina_connection_object_on_connect(RemminaProtocolWidget* gp, Remm
 
 }
 
-static void cb_autoclose_widget(GtkWidget *widget)
+static void remmina_connection_object_closewin(RemminaProtocolWidget* gp)
 {
-	gtk_widget_destroy(widget);
+	TRACE_CALL(__func__);
+	RemminaConnectionObject* cnnobj = gp->cnnobj;
+	RemminaConnectionHolder* cnnhld = cnnobj->cnnhld;
+
+	if (cnnhld && cnnhld->cnnwin && cnnobj->scrolled_container) {
+		gtk_notebook_remove_page(
+			GTK_NOTEBOOK(cnnhld->cnnwin->priv->notebook),
+			gtk_notebook_page_num(GTK_NOTEBOOK(cnnhld->cnnwin->priv->notebook),
+				cnnobj->scrolled_container));
+	}
+
+	cnnobj->remmina_file = NULL;
+	g_free(cnnobj);
+
+
 	remmina_application_condexit(REMMINA_CONDEXIT_ONDISCONNECT);
+}
+
+static void cb_lasterror_confirmed(GtkButton *button, void *cbdata)
+{
+	TRACE_CALL(__func__);
+	printf("GIO: in cb_lasterror_confirmed gp=%p\n", cbdata);
+	remmina_connection_object_closewin((RemminaProtocolWidget*)cbdata);
 }
 
 static void remmina_connection_object_on_disconnect(RemminaProtocolWidget* gp, gpointer data)
@@ -3682,9 +3708,8 @@ static void remmina_connection_object_on_disconnect(RemminaProtocolWidget* gp, g
 	TRACE_CALL(__func__);
 	RemminaConnectionObject* cnnobj = gp->cnnobj;
 	RemminaConnectionHolder* cnnhld = cnnobj->cnnhld;
-	GtkWidget* dialog;
+	RemminaConnectionWindowPriv* priv = cnnhld->cnnwin->priv;
 	GtkWidget* pparent;
-
 
 	/* Detach the protocol widget from the notebook now, or we risk that a
 	 * window delete will destroy cnnobj->proto before we complete disconnection.
@@ -3704,25 +3729,22 @@ static void remmina_connection_object_on_disconnect(RemminaProtocolWidget* gp, g
 		remmina_file_save(cnnobj->remmina_file);
 	}
 
+	remmina_connection_holder_keyboard_ungrab(cnnhld);
+	gtk_toggle_tool_button_set_active(
+		GTK_TOGGLE_TOOL_BUTTON(priv->toolitem_grab),
+		FALSE);
+
+	printf("GIO: gp is %p\n", gp);
+	printf("GIO: cnnobj is %p\n", cnnobj);
+	printf("GIO: cnnobj->cnnhld is %p\n", cnnobj->cnnhld);
+
 	if (remmina_protocol_widget_has_error(gp)) {
-		dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-			remmina_protocol_widget_get_error_message(gp), NULL);
-		g_signal_connect(G_OBJECT(dialog), "response", G_CALLBACK(cb_autoclose_widget), NULL);
-		gtk_widget_show(dialog);
-		remmina_widget_pool_register(dialog);
+		remmina_connection_window_message_panel_show(gp, remmina_protocol_widget_get_error_message(gp),
+			MESSAGE_PANEL_OKBUTTON, G_CALLBACK(cb_lasterror_confirmed), gp);
+	}else {
+		remmina_connection_object_closewin(gp);
 	}
 
-	if (cnnhld && cnnhld->cnnwin && cnnobj->scrolled_container) {
-		gtk_notebook_remove_page(
-			GTK_NOTEBOOK(cnnhld->cnnwin->priv->notebook),
-			gtk_notebook_page_num(GTK_NOTEBOOK(cnnhld->cnnwin->priv->notebook),
-				cnnobj->scrolled_container));
-	}
-
-	cnnobj->remmina_file = NULL;
-	g_free(cnnobj);
-
-	remmina_application_condexit(REMMINA_CONDEXIT_ONDISCONNECT);
 }
 
 static void remmina_connection_object_on_desktop_resize(RemminaProtocolWidget* gp, gpointer data)
@@ -3830,7 +3852,6 @@ GtkWidget* remmina_connection_window_open_from_file_full(RemminaFile* remminafil
 		gtk_notebook_set_current_page(GTK_NOTEBOOK(cnnwin->priv->notebook), i);
 	}
 
-
 	/* Set a name for the widget, for CSS selector */
 	gtk_widget_set_name(GTK_WIDGET(cnnobj->proto), "remmina-protocol-widget");
 
@@ -3908,13 +3929,12 @@ static void remmina_connection_window_message_panel_empty(GtkContainer *mp)
 	gtk_container_foreach(mp, container_remove_cb, (gpointer)mp);
 }
 
-void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp, const gchar *message, unsigned int flags)
+void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp,
+	const gchar *message, unsigned int flags, GCallback ok_callback, gpointer ok_cbdata)
 {
 	TRACE_CALL(__func__);
 	RemminaConnectionObject *cnnobj = gp->cnnobj;
 	GtkWidget *w;
-
-	printf("GIO: message = %s\n", message);
 
 	remmina_connection_window_message_panel_empty(GTK_CONTAINER(cnnobj->message_panel));
 
@@ -3927,8 +3947,14 @@ void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp, con
 	w = gtk_label_new(message);
 	gtk_box_pack_start(GTK_BOX(cnnobj->message_panel), w, TRUE, TRUE, 0);
 	gtk_widget_show(cnnobj->message_panel);
+
+	if (flags & MESSAGE_PANEL_OKBUTTON) {
+		w = gtk_button_new_with_label(_("Close"));
+		gtk_box_pack_start(GTK_BOX(cnnobj->message_panel), w, FALSE, FALSE, 0);
+		printf("GIO: ok_cbdata is %p\n", ok_cbdata);
+		g_signal_connect(G_OBJECT(w), "clicked", ok_callback, ok_cbdata);
+	}
+
 	gtk_widget_show_all(cnnobj->message_panel);
 
 }
-
-
