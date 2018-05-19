@@ -3592,10 +3592,8 @@ static void remmina_connection_object_on_connect(RemminaProtocolWidget* gp, Remm
 {
 	TRACE_CALL(__func__);
 
-	gint i;
 	RemminaConnectionWindow* cnnwin;
 	RemminaConnectionHolder* cnnhld;
-	GtkWidget* tab;
 	gchar *last_success;
 
 	GDateTime *date = g_date_time_new_now_utc();
@@ -3636,33 +3634,9 @@ static void remmina_connection_object_on_connect(RemminaProtocolWidget* gp, Remm
 	/* Save credentials */
 	remmina_file_save(cnnobj->remmina_file);
 
-	if (!cnnhld->cnnwin) {
-		i = remmina_file_get_int(cnnobj->remmina_file, "viewmode", 0);
-		switch (i) {
-		case SCROLLED_FULLSCREEN_MODE:
-		case VIEWPORT_FULLSCREEN_MODE:
-			remmina_connection_holder_create_fullscreen(cnnhld, cnnobj, i);
-			break;
-		case SCROLLED_WINDOW_MODE:
-		default:
-			remmina_connection_holder_create_scrolled(cnnhld, cnnobj);
-			break;
-		}
-	}else {
-		tab = remmina_connection_object_create_tab(cnnobj);
-		i = remmina_connection_object_append_page(cnnobj, GTK_NOTEBOOK(cnnhld->cnnwin->priv->notebook), tab,
-			cnnhld->cnnwin->priv->view_mode);
-		G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-		gtk_widget_reparent(cnnobj->viewport, cnnobj->scrolled_container);
-		G_GNUC_END_IGNORE_DEPRECATIONS
+	/* Hide messages */
+	remmina_connection_window_message_panel_hide(gp);
 
-		gtk_notebook_set_current_page(GTK_NOTEBOOK(cnnhld->cnnwin->priv->notebook), i);
-
-		/* Present the windows after a delay so GTK can realize and show its objects
-		 * before calling gtk_window_present_with_time() */
-		g_timeout_add(200, remmina_connection_object_delayed_window_present, (gpointer)cnnobj);
-
-	}
 
 #if FLOATING_TOOLBAR_WIDGET
 	if (cnnhld->cnnwin->priv->floating_toolbar_widget) {
@@ -3956,5 +3930,15 @@ void remmina_connection_window_message_panel_show(RemminaProtocolWidget *gp,
 	}
 
 	gtk_widget_show_all(cnnobj->message_panel);
+
+}
+
+void remmina_connection_window_message_panel_hide(RemminaProtocolWidget *gp)
+{
+	TRACE_CALL(__func__);
+	RemminaConnectionObject *cnnobj = gp->cnnobj;
+
+	remmina_connection_window_message_panel_empty(GTK_CONTAINER(cnnobj->message_panel));
+	gtk_widget_hide(cnnobj->message_panel);
 
 }
