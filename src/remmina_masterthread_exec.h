@@ -36,7 +36,6 @@
 
 #include <pthread.h>
 #include "remmina_protocol_widget.h"
-#include "remmina_init_dialog.h"
 #include "remmina_sftp_client.h"
 #include "remmina_ftp_client.h"
 #include "remmina_ssh_plugin.h"

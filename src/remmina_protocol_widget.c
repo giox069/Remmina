@@ -53,7 +53,6 @@
 #include "remmina/remmina_trace_calls.h"
 
 struct _RemminaProtocolWidgetPriv {
-	GtkWidget* init_dialog;
 
 	RemminaFile* remmina_file;
 	RemminaProtocolPlugin* plugin;

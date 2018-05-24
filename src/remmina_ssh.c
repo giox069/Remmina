@@ -360,7 +360,7 @@ remmina_ssh_auth(RemminaSSH *ssh, const gchar *password)
 }
 
 gint
-remmina_ssh_auth_gui(RemminaSSH *ssh, RemminaInitDialog *dialog, RemminaFile *remminafile)
+remmina_ssh_auth_gui(RemminaSSH *ssh, RemminaConnectionObject *cnnobj, RemminaFile *remminafile)
 {
 	TRACE_CALL(__func__);
 	gchar *tips;
@@ -371,6 +371,8 @@ remmina_ssh_auth_gui(RemminaSSH *ssh, RemminaInitDialog *dialog, RemminaFile *re
 	guchar *pubkey;
 	ssh_key server_pubkey;
 	gboolean disablepasswordstoring;
+
+	printf("GIO: %s is_masterthread: %s\n", __func__, remmina_masterthread_exec_is_main_thread() ? "Yes":"No");
 
 	/* Check if the server's public key is known */
 	ret = ssh_is_server_known(ssh->session);
@@ -440,11 +442,32 @@ remmina_ssh_auth_gui(RemminaSSH *ssh, RemminaInitDialog *dialog, RemminaFile *re
 
 	/* Requested for a non-empty password */
 	if (ret < 0) {
-		if (!dialog) return -1;
+		g_char *msg;
 
-		remmina_init_dialog_set_status(dialog, tips, ssh->user, ssh->server);
+		if (!cnnobj) {
+			printf("WARNING: cnnobj is null in %s\n", __func__);
+			return -1;
+		}
+		if (!cnnobj->message_panel) {
+			printf("WARNING: cnnobj->message_panel is null in %s\n", __func__);
+			return -1;
+		}
+
+		msg = g_strdup_printf(tips, ssh->user, ssh->server);
+
 		disablepasswordstoring = remmina_file_get_int(remminafile, "disablepasswordstoring", FALSE);
+		remmina_message_panel_authpwd(cnnobj->message_panel, msg, keyname, !disablepasswordstoring);
+
+		g_free(msg);
+
+		ret = remmina_message_panel_wait_user_answer();
+
+/*
+		remmina_init_dialog_set_status(dialog, tips, ssh->user, ssh->server);
+
 		ret = remmina_init_dialog_authpwd(dialog, keyname, !disablepasswordstoring);
+
+*/
 
 		if (ret == GTK_RESPONSE_OK) {
 			if (dialog->save_password)

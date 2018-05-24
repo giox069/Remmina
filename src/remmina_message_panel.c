@@ -39,52 +39,100 @@
 #include "config.h"
 #include "remmina_public.h"
 #include "remmina_widget_pool.h"
-#include "remmina_init_dialog.h"
+#include "remmina_message_panel.h"
 #include "remmina_masterthread_exec.h"
 #include "remmina/remmina_trace_calls.h"
 
-G_DEFINE_TYPE( RemminaInitDialog, remmina_init_dialog, GTK_TYPE_DIALOG)
+#define TRACE_CALL(s) puts(s)
 
-static void remmina_init_dialog_class_init(RemminaInitDialogClass *klass)
+G_DEFINE_TYPE( RemminaMessagePanel, remmina_init_dialog, GTK_TYPE_BOX)
+
+typedef struct _RemminaMessagePanelPriv {
+
+	RemminaConnectionObject *parent_cnnobj;
+
+	GtkWidget *image;
+	GtkWidget *content_vbox;
+	GtkWidget *status_label;
+
+	gint mode;
+
+	gchar *title;
+	gchar *status;
+	gchar *username;
+	gchar *domain;
+	gchar *password;
+	gboolean save_password;
+	gchar *cacert;
+	gchar *cacrl;
+	gchar *clientcert;
+	gchar *clientkey;
+} RemminaMessagePanel;
+
+static void remmina_message_panel_class_init(RemminaMessagePanelClass *klass)
 {
 	TRACE_CALL(__func__);
 }
 
-static void remmina_init_dialog_destroy(RemminaInitDialog *dialog, gpointer data)
+static void remmina_message_panel_destroy(RemminaMessagePanel *dialog, gpointer data)
 {
 	TRACE_CALL(__func__);
-	g_free(dialog->title);
-	g_free(dialog->status);
-	g_free(dialog->username);
-	g_free(dialog->domain);
-	g_free(dialog->password);
-	g_free(dialog->cacert);
-	g_free(dialog->cacrl);
-	g_free(dialog->clientcert);
-	g_free(dialog->clientkey);
+
+
+	g_free(mp->priv->title);
+	g_free(mp->priv->status);
+	g_free(mp->priv->username);
+	g_free(mp->priv->domain);
+	g_free(mp->priv->password);
+	g_free(mp->priv->cacert);
+	g_free(mp->priv->cacrl);
+	g_free(mp->priv->clientcert);
+	g_free(mp->priv->clientkey);
+
+	g_free(mp->priv);
+	mp->priv = NULL;
+
 }
 
-static void remmina_init_dialog_init(RemminaInitDialog *dialog)
+static void remmina_message_panel_init(RemminaMessagePanel *mp)
 {
 	TRACE_CALL(__func__);
+	RemminaMessagePanelPriv *priv;
+
+	mp->mode = REMMINA_PANEL_MODE_IDLE;
+
+	priv = g_new0(RemminaConnectionWindowPriv, 1);
+	mp->priv = priv;
+
+
 	GtkWidget *hbox = NULL;
 	GtkWidget *widget;
 
-	dialog->image = NULL;
-	dialog->content_vbox = NULL;
-	dialog->status_label = NULL;
-	dialog->mode = REMMINA_INIT_MODE_CONNECTING;
-	dialog->title = NULL;
-	dialog->status = NULL;
-	dialog->username = NULL;
-	dialog->domain = NULL;
-	dialog->password = NULL;
-	dialog->save_password = FALSE;
-	dialog->cacert = NULL;
-	dialog->cacrl = NULL;
-	dialog->clientcert = NULL;
-	dialog->clientkey = NULL;
+	mp->image = NULL;
+	mp->content_vbox = NULL;
+	mp->status_label = NULL;
+	mp->title = NULL;
+	mp->status = NULL;
+	mp->username = NULL;
+	mp->domain = NULL;
+	mp->password = NULL;
+	mp->save_password = FALSE;
+	mp->cacert = NULL;
+	mp->cacrl = NULL;
+	mp->clientcert = NULL;
+	mp->clientkey = NULL;
+}
 
+RemminaMessagePanel* remmina_message_panel_init(RemminaConnectionObject* parent_cnnobj)
+{
+	RemminaMessagePanel *mp;
+	mp = GTK_WIDGET(g_object_new(REMMINA_TYPE_PROTOCOL_WIDGET, NULL));
+	mp->parent_cnnobj = parent_cnnobj;
+	return mp;:
+}
+
+
+#ifdef GARBAGE
 	gtk_dialog_add_buttons(GTK_DIALOG(dialog),  _("_Cancel"), GTK_RESPONSE_CANCEL, _("_OK"), GTK_RESPONSE_OK, NULL);
 
 	gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
@@ -119,12 +167,15 @@ static void remmina_init_dialog_init(RemminaInitDialog *dialog)
 	gtk_box_pack_start(GTK_BOX(dialog->content_vbox), widget, TRUE, TRUE, 4);
 	dialog->status_label = widget;
 
-	g_signal_connect(G_OBJECT(dialog), "destroy", G_CALLBACK(remmina_init_dialog_destroy), NULL);
+	g_signal_connect(G_OBJECT(dialog), "destroy", G_CALLBACK(remmina_message_panel_destroy), NULL);
+
+
 
 	remmina_widget_pool_register(GTK_WIDGET(dialog));
 }
+#endif
 
-static void remmina_init_dialog_connecting(RemminaInitDialog *dialog)
+static void remmina_message_panel_connecting(RemminaInitDialog *dialog)
 {
 	TRACE_CALL(__func__);
 	gtk_label_set_text(GTK_LABEL(dialog->status_label), (dialog->status ? dialog->status : dialog->title));
@@ -134,7 +185,7 @@ static void remmina_init_dialog_connecting(RemminaInitDialog *dialog)
 	dialog->mode = REMMINA_INIT_MODE_CONNECTING;
 }
 
-GtkWidget* remmina_init_dialog_new(const gchar *title_format, ...)
+GtkWidget* remmina_message_panel_new(const gchar *title_format, ...)
 {
 	TRACE_CALL(__func__);
 	RemminaInitDialog *dialog;
@@ -147,12 +198,12 @@ GtkWidget* remmina_init_dialog_new(const gchar *title_format, ...)
 	va_end(args);
 	gtk_window_set_title(GTK_WINDOW(dialog), dialog->title);
 
-	remmina_init_dialog_connecting(dialog);
+	remmina_message_panel_connecting(dialog);
 
 	return GTK_WIDGET(dialog);
 }
 
-void remmina_init_dialog_set_status(RemminaInitDialog *dialog, const gchar *status_format, ...)
+void remmina_message_panel_set_status(RemminaInitDialog *dialog, const gchar *status_format, ...)
 {
 	TRACE_CALL(__func__);
 	/* This function can be called from a non main thread */
@@ -184,7 +235,7 @@ void remmina_init_dialog_set_status(RemminaInitDialog *dialog, const gchar *stat
 	}
 }
 
-void remmina_init_dialog_set_status_temp(RemminaInitDialog *dialog, const gchar *status_format, ...)
+void remmina_message_panel_set_status_temp(RemminaInitDialog *dialog, const gchar *status_format, ...)
 {
 	TRACE_CALL(__func__);
 
@@ -214,7 +265,7 @@ void remmina_init_dialog_set_status_temp(RemminaInitDialog *dialog, const gchar 
 	}
 }
 
-gint remmina_init_dialog_authpwd(RemminaInitDialog *dialog, const gchar *label, gboolean allow_save)
+gint remmina_message_panel_authpwd(RemminaMessagePanel *mp, const gchar *message, const gchar *keylabel, gboolean allow_save)
 {
 	TRACE_CALL(__func__);
 
@@ -240,6 +291,10 @@ gint remmina_init_dialog_authpwd(RemminaInitDialog *dialog, const gchar *label, 
 		return retval;
 	}
 
+	if (mp->mode != REMMINA_PANEL_MODE_IDLE) {
+		printf("INTERNAL ERROR: message panel is not in IDLE mode and a new panel has been requested\n");
+	}
+
 	gtk_label_set_text(GTK_LABEL(dialog->status_label), (dialog->status ? dialog->status : dialog->title));
 
 	/* Create grid (was a table) */
@@ -248,40 +303,48 @@ gint remmina_init_dialog_authpwd(RemminaInitDialog *dialog, const gchar *label, 
 	gtk_grid_set_row_spacing(GTK_GRID(grid), 8);
 	gtk_grid_set_column_spacing(GTK_GRID(grid), 8);
 
+	/* Text message */
+	widget = gtk_label_new(message);
+	gtk_widget_set_halign(GTK_WIDGET(widget), GTK_ALIGN_START);
+	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
+	gtk_widget_show(widget);
+	gtk_grid_attach(GTK_GRID(grid), widget, 0, 0, 2, 1);
+
 	/* Icon */
-	gtk_image_set_from_icon_name(GTK_IMAGE(dialog->image), "dialog-password", GTK_ICON_SIZE_DIALOG);
+	/* gtk_image_set_from_icon_name(GTK_IMAGE(dialog->image), "dialog-password", GTK_ICON_SIZE_DIALOG); */
 
 	/* Entries */
 	widget = gtk_label_new(label);
 	gtk_widget_set_halign(GTK_WIDGET(widget), GTK_ALIGN_START);
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
 	gtk_widget_show(widget);
-	gtk_grid_attach(GTK_GRID(grid), widget, 0, 0, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 0, 1, 1, 1);
 
 	password_entry = gtk_entry_new();
 	gtk_widget_show(password_entry);
-	gtk_grid_attach(GTK_GRID(grid), password_entry, 1, 0, 2, 1);
+	gtk_grid_attach(GTK_GRID(grid), password_entry, 1, 1, 2, 1);
 	gtk_entry_set_max_length(GTK_ENTRY(password_entry), 100);
 	gtk_entry_set_visibility(GTK_ENTRY(password_entry), FALSE);
 	gtk_entry_set_activates_default(GTK_ENTRY(password_entry), TRUE);
 
-	s = g_strdup_printf(_("Save %s"), label);
+	s = g_strdup_printf(_("Save %s"), keylabel);
 	save_password_check = gtk_check_button_new_with_label(s);
 	g_free(s);
 	gtk_widget_show(save_password_check);
-	gtk_grid_attach(GTK_GRID(grid), save_password_check, 0, 1, 2, 1);
+	gtk_grid_attach(GTK_GRID(grid), save_password_check, 0, 2, 2, 1);
 	if (dialog->save_password)
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(save_password_check), TRUE);
 	gtk_widget_set_sensitive(save_password_check, allow_save);
 
-	/* Pack it into the dialog */
-	gtk_box_pack_start(GTK_BOX(dialog->content_vbox), grid, TRUE, TRUE, 4);
-
-	gtk_dialog_set_response_sensitive(GTK_DIALOG(dialog), GTK_RESPONSE_OK, TRUE);
+	/* Pack it into the RemminaMessagePanel (which is a GtkBox) */
+	gtk_box_pack_start(GTK_BOX(mb), grid, TRUE, TRUE, 4);
 
 	gtk_widget_grab_focus(password_entry);
 
 	dialog->mode = REMMINA_INIT_MODE_AUTHPWD;
+
+	/* Show it */
+	remmina_connection_object_show_message_panel(mp->priv->parent_cnnobj);
 
 	/* Now run it */
 	ret = gtk_dialog_run(GTK_DIALOG(dialog));
@@ -293,12 +356,18 @@ gint remmina_init_dialog_authpwd(RemminaInitDialog *dialog, const gchar *label, 
 
 	gtk_widget_destroy(grid);
 
-	remmina_init_dialog_connecting(dialog);
+	remmina_message_panel_connecting(dialog);
 
 	return ret;
 }
 
-gint remmina_init_dialog_authuserpwd(RemminaInitDialog *dialog, gboolean want_domain, const gchar *default_username,
+gint remmina_message_panel_wait_user_answer(RemminaMessagePanel *mp)
+{
+	/* This function is very similar to gtk_dialog_run() for a dialog box */
+
+}
+
+gint remmina_message_panel_authuserpwd(RemminaInitDialog *dialog, gboolean want_domain, const gchar *default_username,
 				     const gchar *default_domain, gboolean allow_save)
 {
 	TRACE_CALL(__func__);
@@ -422,12 +491,12 @@ gint remmina_init_dialog_authuserpwd(RemminaInitDialog *dialog, gboolean want_do
 
 	gtk_widget_destroy(grid);
 
-	remmina_init_dialog_connecting(dialog);
+	remmina_message_panel_connecting(dialog);
 
 	return ret;
 }
 
-gint remmina_init_dialog_certificate(RemminaInitDialog* dialog, const gchar* subject, const gchar* issuer, const gchar* fingerprint)
+gint remmina_message_panel_certificate(RemminaInitDialog* dialog, const gchar* subject, const gchar* issuer, const gchar* fingerprint)
 {
 	TRACE_CALL(__func__);
 
@@ -528,7 +597,7 @@ gint remmina_init_dialog_certificate(RemminaInitDialog* dialog, const gchar* sub
 
 	return status;
 }
-gint remmina_init_dialog_certificate_changed(RemminaInitDialog* dialog, const gchar* subject, const gchar* issuer, const gchar* new_fingerprint, const gchar* old_fingerprint)
+gint remmina_message_panel_certificate_changed(RemminaInitDialog* dialog, const gchar* subject, const gchar* issuer, const gchar* new_fingerprint, const gchar* old_fingerprint)
 {
 	TRACE_CALL(__func__);
 
@@ -645,7 +714,7 @@ gint remmina_init_dialog_certificate_changed(RemminaInitDialog* dialog, const gc
 }
 
 /* NOT TESTED */
-static GtkWidget* remmina_init_dialog_create_file_button(GtkGrid *grid, const gchar *label, gint row, const gchar *filename)
+static GtkWidget* remmina_message_panel_create_file_button(GtkGrid *grid, const gchar *label, gint row, const gchar *filename)
 {
 	TRACE_CALL(__func__);
 	GtkWidget *widget;
@@ -672,7 +741,7 @@ static GtkWidget* remmina_init_dialog_create_file_button(GtkGrid *grid, const gc
 	return widget;
 }
 
-gint remmina_init_dialog_authx509(RemminaInitDialog *dialog, const gchar *cacert, const gchar *cacrl, const gchar *clientcert,
+gint remmina_message_panel_authx509(RemminaInitDialog *dialog, const gchar *cacert, const gchar *cacrl, const gchar *clientcert,
 				  const gchar *clientkey)
 {
 	TRACE_CALL(__func__);
@@ -714,10 +783,10 @@ gint remmina_init_dialog_authx509(RemminaInitDialog *dialog, const gchar *cacert
 	gtk_image_set_from_icon_name(GTK_IMAGE(dialog->image), "dialog-password", GTK_ICON_SIZE_DIALOG);
 
 	/* Buttons for choosing the certificates */
-	cacert_button = remmina_init_dialog_create_file_button(GTK_GRID(grid), _("CA certificate"), 0, cacert);
-	cacrl_button = remmina_init_dialog_create_file_button(GTK_GRID(grid), _("CA CRL"), 1, cacrl);
-	clientcert_button = remmina_init_dialog_create_file_button(GTK_GRID(grid), _("Client certificate"), 2, clientcert);
-	clientkey_button = remmina_init_dialog_create_file_button(GTK_GRID(grid), _("Client key"), 3, clientkey);
+	cacert_button = remmina_message_panel_create_file_button(GTK_GRID(grid), _("CA certificate"), 0, cacert);
+	cacrl_button = remmina_message_panel_create_file_button(GTK_GRID(grid), _("CA CRL"), 1, cacrl);
+	clientcert_button = remmina_message_panel_create_file_button(GTK_GRID(grid), _("Client certificate"), 2, clientcert);
+	clientkey_button = remmina_message_panel_create_file_button(GTK_GRID(grid), _("Client key"), 3, clientkey);
 
 	/* Pack it into the dialog */
 	gtk_box_pack_start(GTK_BOX(dialog->content_vbox), grid, TRUE, TRUE, 4);
@@ -737,12 +806,12 @@ gint remmina_init_dialog_authx509(RemminaInitDialog *dialog, const gchar *cacert
 
 	gtk_widget_destroy(grid);
 
-	remmina_init_dialog_connecting(dialog);
+	remmina_message_panel_connecting(dialog);
 
 	return ret;
 }
 
-gint remmina_init_dialog_serverkey_confirm(RemminaInitDialog *dialog, const gchar *serverkey, const gchar *prompt)
+gint remmina_message_panel_serverkey_confirm(RemminaInitDialog *dialog, const gchar *serverkey, const gchar *prompt)
 {
 	TRACE_CALL(__func__);
 
@@ -803,28 +872,31 @@ gint remmina_init_dialog_serverkey_confirm(RemminaInitDialog *dialog, const gcha
 	/* Now run it */
 	ret = gtk_dialog_run(GTK_DIALOG(dialog));
 	gtk_widget_destroy(vbox);
-	remmina_init_dialog_connecting(dialog);
+	remmina_message_panel_connecting(dialog);
 
 	return ret;
 }
 
 
-gint remmina_init_dialog_serverkey_unknown(RemminaInitDialog *dialog, const gchar *serverkey)
+gint remmina_message_panel_serverkey_unknown(RemminaInitDialog *dialog, const gchar *serverkey)
 {
 	TRACE_CALL(__func__);
 	/* This function can be called from a non main thread */
 
-	return remmina_init_dialog_serverkey_confirm(dialog, serverkey,
+	return remmina_message_panel_serverkey_confirm(dialog, serverkey,
 		_("The server is unknown. The public key fingerprint is:"));
 }
 
-gint remmina_init_dialog_serverkey_changed(RemminaInitDialog *dialog, const gchar *serverkey)
+gint remmina_message_panel_serverkey_changed(RemminaInitDialog *dialog, const gchar *serverkey)
 {
 	TRACE_CALL(__func__);
 	/* This function can be called from a non main thread */
 
-	return remmina_init_dialog_serverkey_confirm(dialog, serverkey,
+	return remmina_message_panel_serverkey_confirm(dialog, serverkey,
 		_("WARNING: The server has changed its public key. This means either you are under attack,\n"
 			"or the administrator has changed the key. The new public key fingerprint is:"));
 }
+
+
+
 
